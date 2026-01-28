@@ -65,19 +65,26 @@
 
 ---
 
-### （可选）第四天：browser-use 内核重构与分支实验
-**目标**：在保留现有 Playwright 手写 Agent 的前提下，引入 browser-use 作为新的 Web Agent 内核，并为未来接入 Qwen-VL 做准备。  
-* **建议分支策略**：
-    * 在当前基础上创建一个长期保留分支（例如 `playwright-baseline`），完整保存 Day 1–3 的实现。
-    * 在主分支上开始 browser-use 版本的重构与实验，必要时可随时对比或回滚。
-* **核心任务（browser-use 路线）**：
+### 第四天：视觉增强 Agent（Kimi = 大脑，Qwen-VL = 眼睛）
+**目标**：在现有 Playwright + Kimi + Docker + FastAPI + noVNC 的基础上，引入 Qwen-VL 作为视觉模块，让 Agent 能“看懂”真实网页布局并据此行动。  
+* **分支策略**：
+    * 在 `max/playwright-baseline-mvp` 分支完整保留 Day 1–3 的实现，作为稳定基线。
+    * 在 `main` 分支上演进视觉能力（Qwen-VL），browser-use 作为未来可选的内核重构方向，而非当前必选依赖。
+* **已完成的核心任务**：
+    * [x] 设计并实现统一的视觉工具接口 `visual_inspect(page, question) -> str`，在搜索结果页调用该工具进行视觉分析。
+    * [x] 在 `visual_tool.py` 中实现截图逻辑，将当前页面保存到 `screenshots/` 目录（并已在 `.gitignore` 中忽略）。
+    * [x] 通过 OpenAI 兼容接口接入 Qwen-VL：使用 `VL_MODEL / VL_BASE_URL / VL_API_KEY` 创建 `ChatOpenAI` 客户端，将截图以 `image_url` + 文本问题的形式发送给 Qwen-VL，获取关于页面布局和关键信息的描述。
+    * [x] 在 `agent_test.py` 中组合 Kimi + Qwen-VL：Kimi 负责任务规划与最终“未来14天天气总结”，Qwen-VL 负责描述搜索结果页的视觉结构，为 Kimi 提供额外上下文。
+    * [x] 在本地与 Docker + noVNC 环境中验证：通过 Web UI 点击“启动 Agent”，可在右侧屏幕中看到浏览器自动操作，同时在终端日志中看到 Qwen-VL 的视觉分析和 Kimi 的天气报告。
+* **后续可选任务（browser-use 路线，暂未实现）**：
     * [ ] 新增 `browser_use_agent.py`，用 Kimi + browser-use 跑通“打开百度”的最小 Demo（先在本机验证）。
-    * [ ] 在 FastAPI 中为 browser-use 版本新增独立的 `/run_browser_use` 接口，便于与现有 `/run` 对比。
+    * [ ] 在 FastAPI 中为 browser-use 版本新增独立的 `/run_browser_use` 接口，便于与现有 `/run` / `/run_visual` 对比。
     * [ ] 将 browser-use Agent 挂载到 Docker + VNC 链路中，在 noVNC 画面中观察其自动操作过程。
-    * [ ] 设计并实现一个“视觉点击”工具，将 Qwen-VL 接入 browser-use 的 tool 体系，用截图 + 坐标方式完成复杂点击。
+    * [ ] 将当前的 Qwen-VL 视觉工具接入 browser-use 的 tool 体系，实现“视觉点击”等更复杂的交互。
 * **验证点**：
-    * [ ] 同一套 UI 下，可以分别触发 Playwright-baseline 与 browser-use 版本，对比行为差异。
-    * [ ] 在复杂页面结构下，browser-use + Qwen-VL 能成功完成传统 DOM 选择困难的点击与操作。
+    * [x] 在同一套 UI 下，用户可以通过 `/run` 体验“文本 + DOM”方案，通过 `/run_visual` 体验“文本 + 视觉（Qwen-VL）”增强方案。
+    * [x] 在复杂搜索结果页中，Qwen-VL 能输出对页面结构的自然语言描述，为 Kimi 的最终决策提供额外线索。
+    * [ ] 在未来集成 browser-use 后，可在复杂 DOM 结构下进一步验证“browser-use + Qwen-VL”对视觉点击和复杂交互的提升效果。
 
 #### 设计思路（Kimi = 大脑，Qwen-VL = 眼睛）
 - **Kimi 作为“大脑（Planner / Reasoner）”**  

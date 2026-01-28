@@ -78,3 +78,28 @@
 * **验证点**：
     * [ ] 同一套 UI 下，可以分别触发 Playwright-baseline 与 browser-use 版本，对比行为差异。
     * [ ] 在复杂页面结构下，browser-use + Qwen-VL 能成功完成传统 DOM 选择困难的点击与操作。
+
+#### 设计思路（Kimi = 大脑，Qwen-VL = 眼睛）
+- **Kimi 作为“大脑（Planner / Reasoner）”**  
+  - 负责理解用户指令、拆解任务、规划浏览器需要执行的高层步骤（打开哪些站点、搜索什么关键词、何时需要“看一眼屏幕”等）。  
+  - 在代码层面，可以继续沿用 `agent_test.py` 中的 Kimi 调用逻辑，只是将具体的浏览器动作封装为独立的“工具”调用。
+
+- **Qwen-VL 作为“眼睛（视觉感知模块）”**  
+  - 当“大脑”需要读取页面视觉信息时，调用一个统一的视觉工具：  
+    1. 由 Playwright 或 browser-use 截取当前屏幕截图。  
+    2. 将截图 + 自然语言问题（例如“找到绿色按钮”“识别未来14天天气的卡片”）发送给 Qwen-VL。  
+    3. 返回结构化结果（坐标、元素描述或推荐点击区域），再由浏览器执行层完成具体点击或滚动。
+
+- **浏览器执行层（Playwright / browser-use）**  
+  - 继续使用 Playwright 作为底层浏览器驱动（已通过 Docker + Xvfb + noVNC 验证稳定）。  
+  - 后续可逐步将高层控制逻辑迁移到 browser-use（作为 Web Agent 内核），由其管理“navigate / click / extract”等动作循环，同时在需要时调用 Qwen-VL 视觉工具。
+
+- **工作流集成（FastAPI）**  
+  - 通过 FastAPI 提供不同模式的接口，例如：  
+    - `/run`：Kimi + Playwright（现有文本 + DOM 方案）。  
+    - `/run_visual`：Kimi + Playwright/browser-use + Qwen-VL（视觉增强方案）。  
+  - 前端 UI 继续通过 HTTP/SSE 调用这些接口，不直接依赖具体的浏览器控制实现。
+
+- **前端展示（noVNC Iframe）**  
+  - 现有的 Docker + Xvfb + x11vnc + noVNC 架构保持不变：任何在容器中 `DISPLAY=:99` 上运行的浏览器动作，都会实时映射到 `http://localhost:6080/vnc_lite.html?...`。  
+  - FastAPI `/` 页面继续通过右侧 Iframe 嵌入 noVNC，实现“左侧下指令，右侧看浏览器自己干活”的最终体验。

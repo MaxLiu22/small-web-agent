@@ -1,12 +1,17 @@
-# 🧩 可观测的多模态 Hello-World Web Agent：LLM + VLM + 实时画面
+# 🍭 Hello-World Web Agent：LLM + VLM + Live view
 
-一个简单的 Web Agent 演示项目，通过简单的配置即可实现：
+> 一个能"看见"网页、会"思考"、还能让你"围观"它干活的 Web Agent 🎬
 
-1. **逻辑推理**：使用 **Kimi (LLM)** 推理任务步骤
-2. **视觉识别**：使用 **Qwen-VL (VLM)** 识别网页内容
-3. **实时观测**：通过 **Playwright** 与 **noVNC** 在前端实时显示浏览器操作
+让 AI 帮你自动操作浏览器，并且你可以在网页上实时看到它的每一步操作。这个项目结合了：
 
-这是一个 Hello World 级别的脚手架项目，适合快速上手和二次开发。
+1. **🧠 逻辑推理**：使用 **Kimi (LLM)** 规划任务步骤
+2. **👁️ 视觉识别**：使用 **Qwen-VL (VLM)** 理解网页布局和内容
+3. **📺 实时观测**：通过 **Playwright** 与 **noVNC** 在浏览器中实时观看 Agent 的操作过程
+
+这是一个 Hello World 级别的脚手架项目，适合快速上手和二次开发。你可以用它来：
+- 🎯 快速搭建一个可观测的 Web Agent 原型
+- 🔍 学习 LLM + VLM 在浏览器自动化中的应用
+- 🛠️ 作为二次开发的基础模板
 
 ## 🏗️ 技术架构
 * **大脑 (Reasoning):** Kimi API (OpenAI 兼容协议)
@@ -90,6 +95,5 @@ docker-compose down
 ---
 
 ## 📄 开发日志与路线图
-详细的 3-Day Sprint 冲刺记录、Day4 视觉增强设计以及未来路线图，请查看：
 
 - **`LOGS.md`** - 开发进度与规划文档

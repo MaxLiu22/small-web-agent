@@ -1,9 +1,15 @@
 """
 一个极简的 Web Agent 骨架，帮助你理解“指令 -> 思考 -> 操作”三阶段结构。
 
-这版开始引入 Playwright，打开一个真实的浏览器页面。
+这版：
+- 用 Playwright 打开一个真实的浏览器页面
+- 用 Kimi（通过 OpenAI 兼容接口）来生成“操作计划”
 """
 
+import os
+
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 from playwright.sync_api import sync_playwright
 
 
@@ -13,22 +19,64 @@ def get_user_instruction() -> str:
     return "帮我查看深圳未来14天天气，并总结适合户外活动的日期。"
 
 
+def _load_kimi_client() -> ChatOpenAI:
+    """
+    加载 .env 中的 Kimi 配置，并返回一个 LangChain 的 ChatOpenAI 客户端。
+
+    这里假设你在项目根目录下创建了 `.env` 文件，并配置了：
+    - KIMI_API_KEY
+    - KIMI_BASE_URL
+    - KIMI_MODEL（可选，有默认值）
+    """
+    load_dotenv()
+
+    api_key = os.getenv("KIMI_API_KEY")
+    base_url = os.getenv("KIMI_BASE_URL")
+    model = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
+
+    if not api_key or not base_url:
+        raise RuntimeError(
+            "缺少 Kimi 配置：请在项目根目录创建 `.env` 文件，并设置 "
+            "KIMI_API_KEY 和 KIMI_BASE_URL（可参考你自己的 Kimi 文档）。"
+        )
+
+    return ChatOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        temperature=0.2,
+    )
+
+
 def think_about_plan(instruction: str) -> list[str]:
     """
-    模拟“思考”阶段：根据指令，产出一个非常粗糙的操作计划。
+    使用 Kimi 来思考“如何在浏览器里完成这个任务”，并返回一个步骤列表。
 
-    未来这里会改成：调用 Kimi API，让模型来生成更复杂的操作序列。
+    为了简单起见，我们让模型输出多行文本，每行一个步骤，然后按行拆分。
     """
-    print("🧠 [思考中] 根据指令规划浏览器操作步骤...")
-    plan = [
-        "打开浏览器",
-        "访问搜索引擎（如 https://www.baidu.com）",
-        "搜索：深圳 未来14天天气",
-        "打开一个权威天气网站结果页",
-        "阅读并整理未来14天的天气情况",
-        "标记适合户外活动的日期，并给出原因",
-    ]
-    return plan
+    print("🧠 [思考中] 调用 Kimi 规划浏览器操作步骤...")
+    llm = _load_kimi_client()
+
+    prompt = (
+        "你是一个需要通过普通浏览器完成任务的智能体。\n"
+        "用户指令如下，请你规划一份在浏览器中执行的操作步骤。\n"
+        "要求：\n"
+        "1. 用简体中文回答。\n"
+        "2. 每行只写一个步骤，可以带编号也可以不带，但尽量简短清晰。\n"
+        "3. 步骤里只描述“我要在浏览器里做什么”，不要给最终天气结论。\n\n"
+        f"用户指令：{instruction}\n"
+    )
+
+    response = llm.invoke(prompt)
+    text = getattr(response, "content", str(response))
+
+    # 按行拆分成步骤列表，过滤掉空行
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    print("🧠 [Kimi 返回的原始步骤文本]:")
+    for line in lines:
+        print("  ", line)
+
+    return lines
 
 
 def execute_plan(plan: list[str]) -> None:
@@ -47,6 +95,29 @@ def execute_plan(plan: list[str]) -> None:
         page = browser.new_page()
         page.goto("https://www.baidu.com", wait_until="load")
         print("✅ 浏览器已打开百度首页，你可以看到一个新窗口弹出。")
+
+        # 这里做一件非常具体的事：在搜索框输入“深圳 未来14天天气”并回车
+        try:
+            print("⌨️ [Playwright] 正在自动输入搜索内容并回车：深圳 未来14天天气")
+
+            # 你提供的 DOM 里，真正可编辑的是 id="chat-textarea" 的 textarea
+            # 我们优先直接用这个元素；如果找不到，再回退到传统搜索框。
+            search_box = None
+
+            chat_textarea = page.locator("#chat-textarea")
+            if chat_textarea.count() > 0:
+                print("🔍 使用 #chat-textarea 作为搜索输入。")
+                search_box = chat_textarea.first
+            else:
+                print("🔍 未找到 #chat-textarea，回退到 input[name=\"wd\"]。")
+                search_box = page.locator('input[name="wd"]')
+
+            search_box.click()
+            search_box.fill("深圳 未来14天天气")
+            page.keyboard.press("Enter")
+        except Exception as e:
+            print(f"⚠️ 自动搜索过程中出现异常：{e}")
+
         # 为了让你有时间看到页面，不要立刻关闭浏览器
         input("按下回车键后关闭浏览器并结束脚本...")
         browser.close()
@@ -66,7 +137,7 @@ def main() -> None:
     # 3. 操作
     execute_plan(plan)
 
-    print("✅ Demo 结束（目前还没有调用 Kimi，只是打开了一个真实浏览器）")
+    print("✅ Demo 结束（Kimi 负责思考步骤，Playwright 负责真实浏览器操作）")
 
 
 if __name__ == "__main__":
